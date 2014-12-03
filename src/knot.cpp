@@ -3,6 +3,7 @@
 #include "geometry_functions.h"
 #include <iostream>
 #include <set>
+#include <stack>
 #include <queue>
 
 #ifdef __APPLE__
@@ -24,6 +25,13 @@ float abs_f(float a)
     if(a<0)return -a;
     else return a;
 }
+int remain(int in, int d)
+{	if(in>=0) return in%d;
+	else return in%d+ d;
+}
+
+
+
 
 class set_compare
 {   float* sweep_status;
@@ -118,6 +126,7 @@ knot::knot()
     {
         edge[i].index=i;
     }
+    DrawType=0;
 
     pointlessArrayCreatingFunction(light_ambient , 0.40f, 0.40f, 0.40f, 0.0f );
     pointlessArrayCreatingFunction( light_diffuse , 1.0f, 1.0f, 1.0f, 0.0f );
@@ -163,9 +172,9 @@ void knot::drawEdge(int i,float r=-1,float g=-1, float b=-1)
 {   float v1[3],v2[3],v3[3],v4[3],n[3];
     float tempx[3],tempy[3];
     float x[3],y[3],z[3],s,c;
-    y[0]=1;
+    y[0]=0;
     y[1]=0;
-    y[2]=0;
+    y[2]=1;
     if(r!=-1)
     {
         glColor3f(r,g,b);
@@ -320,6 +329,50 @@ point_for_BO findIntersection(line_segment a, line_segment b,knot* K)
     }
 }
 
+bool isAbove(point_for_BO t,knot* K)
+{
+    if(K->vertex[K->edge[t.edge_no].d][0]==K->vertex[K->edge[t.edge_no].s][0])
+    {
+        float y1=K->vertex[K->edge[t.edge_no].s][1];
+        float y2=K->vertex[K->edge[t.edge_no].d][1];
+        float z1=K->vertex[K->edge[t.edge_no].s][2];
+        float z2=K->vertex[K->edge[t.edge_no].d][2];
+        float a=z1+(((t.y-y1)*(z2-z1))/(y2-y1));
+        y1=K->vertex[K->edge[t.edge_no2].s][1];
+        y2=K->vertex[K->edge[t.edge_no2].d][1];
+        z1=K->vertex[K->edge[t.edge_no2].s][2];
+        z2=K->vertex[K->edge[t.edge_no2].d][2];
+        float b=z1+(((t.y-y1)*(z2-z1))/(y2-y1));
+
+        if(a>b)
+            return true;
+        else
+            return false;
+
+    }
+    else
+    {
+        float x1=K->vertex[K->edge[t.edge_no].s][0];
+        float x2=K->vertex[K->edge[t.edge_no].d][0];
+        float z1=K->vertex[K->edge[t.edge_no].s][2];
+        float z2=K->vertex[K->edge[t.edge_no].d][2];
+        float a=z1+(((t.x-x1)*(z2-z1))/(x2-x1));
+        x1=K->vertex[K->edge[t.edge_no2].s][0];
+        x2=K->vertex[K->edge[t.edge_no2].d][0];
+        z1=K->vertex[K->edge[t.edge_no2].s][2];
+        z2=K->vertex[K->edge[t.edge_no2].d][2];
+        float b=z1+(((t.x-x1)*(z2-z1))/(x2-x1));
+
+        if(a>b)
+            return true;
+        else
+            return false;
+
+    }
+
+    return true;
+}
+
 void knot::findCrossings()
 { //  cout<<"Commencing crossing detection";
     priority_queue<point_for_BO,vector<point_for_BO>,queue_compare> E;
@@ -355,11 +408,15 @@ void knot::findCrossings()
     while(!E.empty())
     {
         point_for_BO temp=E.top();
+
         *sweep_status=temp.x;
    //     cout<<"\nSweep Status ="<<*sweep_status;
        switch(temp.type)
         {
             case -1://cout<<"\nLeft endpoint detected for "<<temp.edge_no;
+                    if(isClosed || temp.edge_no!=0)
+                    {
+
 
                     S_it=S.insert(edge[temp.edge_no]).first;
 
@@ -387,19 +444,21 @@ void knot::findCrossings()
                         S_it--;
                     }
 
+                    }
+
                     break;
 
             case 1: //cout<<"\nRight endpoint detected for "<<temp.edge_no;
                     *sweep_status-=0.001;
-                   // cout<<"\nErasing!! an element";
-                  //  cout<<"\n\t\t\t\tErased ";
-                  S.erase(edge[temp.edge_no]);
-                   // cout<<"\nErased an element";
+                    // cout<<"\nErasing!! an element";
+                    //  cout<<"\n\t\t\t\tErased ";
+                    S.erase(edge[temp.edge_no]);
+                    // cout<<"\nErased an element";
                     break;
 
             case 0:
                     //cout<<"\n!!!!    !!!!!Crossing detected of edge "<<temp.edge_no<<" and "<<temp.edge_no2;
-                    if((vertex[edge[temp.edge_no].s][3]+(((vertex[edge[temp.edge_no].d][2]-vertex[edge[temp.edge_no].s][2])/(vertex[edge[temp.edge_no].d][1]-vertex[edge[temp.edge_no].s][1]))*(temp.y-vertex[edge[temp.edge_no].s][1]))) > (vertex[edge[temp.edge_no2].s][3]+(((vertex[edge[temp.edge_no2].d][2]-vertex[edge[temp.edge_no2].s][2])/(vertex[edge[temp.edge_no2].d][1]-vertex[edge[temp.edge_no2].s][1]))*(temp.y-vertex[edge[temp.edge_no2].s][1]))) )
+                    if(isAbove(temp,this))
                     {
                         obtained.a=temp.edge_no;
                         obtained.b=temp.edge_no2;
@@ -545,6 +604,7 @@ void knot::findDTandBridges()
     set_compare2 optor(this);
     pair<int,int> temp;
     pair<int,int>temp2;
+    int bridge_count;
 
     for(int i=0;i<crossing_count;i++)
     {
@@ -565,14 +625,11 @@ void knot::findDTandBridges()
   //      index++;
     }
     /*
-    if(V.size()!=2*crossing_count)
-    {
-        cout<<"\n!!!! I FEAR OBLIVION!";
-    }*/
     for(int q=0;q<2*crossing_count;q++)
     {
-        cout<<q+1<<".)"<<V[q].first<<" "<<V[q].second<<" | "<<crossing[V[q].second].a<<" "<<crossing[V[q].second].b<<endl;
+        cout<<q+1<<".)"<<V[q].first<<" "<<V[q].se   cond<<" | "<<crossing[V[q].second].a<<" "<<crossing[V[q].second].b<<endl;
     }
+    */
     int index=0;
     int DTindex=0;
     for(set<pair<int,int>,set_compare2>::iterator i=S.begin();i!=S.end();i++)
@@ -610,33 +667,255 @@ void knot::findDTandBridges()
             }
           //  cout<<"\nPairing "<<index+1<<" with "<<out+1;
             DTcode[DTindex]=out+1;
-            if(crossing[V[out].second].a==V[out].first)DTcode[DTindex]*=-1; //Is BUGGY
+            if(crossing[V[out].second].a==V[out].first)DTcode[DTindex]*=-1; //Is BUGGY?
         }
 
         i++;
         index++;
         index++;
         DTindex++;
-    }/*
+    }
+
     bridge_count=0;
-    for(set<pair<int,int>,set_compare2>::iterator i=S.begin();i!=S.end();i++)
-    {
-        if(crossing[i->second].b==i->first)
+    for(set<pair<int,int>,set_compare2>::iterator i=S.begin();i!=S.end();i++) //this is a traversal of the knot
+    { //  cout<<"\nLoop for bridge happened";
+       // cout<<"\n\tOn crossing "<<i->second;
+        if(crossing[i->second].b==i->first)   //   this is when it has traversed to an undercrossing
+        {  // cout<<"\n\tOn the underside";
+
             bridge[bridge_count].d=i->second;
-        if(++i!=S.end())
-        {
-            --i;
-            bridge_count++;
-            bridge[bridge_count].s=i->second;
+            crossing[i->second].under1=bridge_count;
+
+            if(++i!=S.end())
+            {   --i;
+              //   cout<<"\n\tAdding a bridge starting at "<<i->second;
+                bridge_count++;
+                bridge[bridge_count].s=i->second;
+                crossing[i->second].under2=bridge_count;
+            }
+            else
+            {  // cout<<"\n\tThe traversal will terminate here";
+                --i;
+                bridge_count++;
+                bridge[0].s=i->second;
+                crossing[i->second].under2=0;
+            }
         }
         else
         {
-            --i;
-            bridge[0].s=i->second;
+       //     cout<<"\n\tOn the overside";
+            crossing[i->second].over=bridge_count;
+            if(++i==S.end())
+            {   --i;
+      //          cout<<"\n\tAbout to terminate";
+                bridge[0].s=bridge[bridge_count].s;
+                crossing[i->second].over=0;
+            }
+            else
+            {
+                --i;
+            }
         }
     }
-    */
+
 
 }
 
+class state
+{
+    public:
+    bridge_struct data[500];
+    void print(knot* K)
+    {
+        cout<<"\n\nPrinting state:";
+        for(int i=0;i<K->crossing_count;i++)
+        {
+            cout<<"\nArc "<<data[i].s<<" to "<<data[i].d<<" has label "<<data[i].label;
+        }
+    }
+    int discuss_crossing(int i,int n, knot* K)
+    {   int u1=data[K->crossing[i].under1].label;
+        int u2=data[K->crossing[i].under2].label;
+        int o=data[K->crossing[i].over].label;
+   //     cout<<"\nDiscussing crossing "<<i<<" where u1,u2 and o are "<<u1<<","<<u2<<" and "<<o;
+        if( u1!=-1 && u2!=-1 && o!=-1 )
+        {
+            if(remain(2*o,n)!=remain(u1+u2,n))
+                return 3;
+            else return 0;
+        }
+        else if ((u1==-1 && u2==-1) || (u1==-1 && o==-1) || (o==-1 && u2==-1))
+        {
+            return 1;
+        }
+        else
+        {
+            if(u1==-1)
+            {
+                data[K->crossing[i].under1].label=remain(2*o-u2,n);
+             //   cout<<"\n\tOn crossing "<<i<<", o and u2 are "<<o<<" and "<<u2<<" so data index "<<K->crossing[i].under1<<" is being set to "<<data[K->crossing[i].under1].label;
+            }
+            else if(u2==-1)
+            {
+                data[K->crossing[i].under2].label=remain(2*o-u1,n);
+             //   cout<<"\n\tOn crossing "<<i<<", o and u1 are "<<o<<" and "<<u1<<" so data index "<<K->crossing[i].under2<<" is being set to "<<data[K->crossing[i].under2].label;
+            }
+            else if(o==-1)
+            {
+                data[K->crossing[i].over].label=(remain(u1+u2,2)==0)?(remain((u1+u2)/2,n)):(remain((u1+u2+n)/2,n));
+             //   cout<<"\n\tOn crossing "<<i<<", u1 and u2 are "<<u1<<" and "<<u2<<" so data index "<<K->crossing[i].over<<" is being set to "<<data[K->crossing[i].over].label;
+            }
+            return 2;
+        }
+    }
+
+    int saturate(int n,knot* K)
+    {
+        int out,eval;
+        int flag=0,flag2=0;
+        while(flag==0)
+        {   flag=1;
+            out=-1;
+            flag2=0;
+            for(int i=0;i<K->crossing_count;i++)
+            {
+                eval=discuss_crossing(i,n,K);
+                if(eval==1)
+                {
+                    out=i;
+                }
+                else if(eval==2)
+                {
+                    flag=0;
+                }
+                else if(eval==3)
+                {
+                    flag2=1;
+                 //   cout<<"\nCrossing no "<<i<<" is preposterous and evil!";
+                }
+            }
+        }
+        if(flag2==1)
+            return -2;
+        else return out;
+    }
+
+
+
+};
+
+
+void knot::findTricolorability(int n) //A depth first search for finding tricolorability
+{
+    stack<state> S;
+    state start,curr;
+    for(int i=0;i<crossing_count;i++)
+        start.data[i]=bridge[i];
+    for(int i=0;i<crossing_count;i++)
+    {
+        start.data[i].label=-1;
+    }
+    start.data[0].label=0;
+    S.push(start);
+    int found=0,location;
+    while(!S.empty() && found==0)
+    { //  cout<<"\n\nI have resolved to find!";
+        curr=S.top();
+        S.pop();
+        location=curr.saturate(n,this);
+      //  curr.print(this);
+    //    cout<<"\nLocation of work needing to be done is at "<<location;
+        if(location==-1)
+        {  // cout<<"\nThis could make history! I have found a coloration";
+            int checker[500];
+            for(int i=0;i<n;i++)
+                checker[i]=0;
+            for(int i=0;i<n;i++)
+                checker[curr.data[i].label]=1;
+            int no;
+            for(int i=0;i<n;i++)
+                no+=checker[i];
+          //  cout<<"\nNumber of colors used here = "<<no;
+            if(no>=n-1)
+            {
+                found=1;
+             //   cout<<"\n\tYes! This is the coloration!";
+            }
+            else
+            {
+              //  cout<<"\n\tIt appears not";
+            }
+        }
+        else if(location==-2)
+        {
+          //  cout<<"\nIncorrect coloration! Ditch this!";
+        }
+        else
+        {
+         //   cout<<"\nI will work on "<<location<<" now";
+            if(crossing[location].under1==crossing[location].over || crossing[location].under2==crossing[location].over )
+            { //  cout<<" but the location has a repeated bridge";
+                if(curr.data[crossing[location].under1].label!=-1)
+                    curr.data[crossing[location].over].label=curr.data[crossing[location].under2].label=curr.data[crossing[location].under1].label;
+                if(curr.data[crossing[location].under2].label!=-1)
+                    curr.data[crossing[location].under1].label=curr.data[crossing[location].over].label=curr.data[crossing[location].under2].label;
+                if(curr.data[crossing[location].over].label!=-1)
+                    curr.data[crossing[location].under1].label=curr.data[crossing[location].under2].label=curr.data[crossing[location].over].label;
+                S.push(curr);
+            }
+            else
+            {//   cout<<" and let's now assume all possible labels. Here labels of u1, u2 and o are ";
+                int u1=curr.data[crossing[location].under1].label;
+                int u2=curr.data[crossing[location].under2].label;
+                int o=curr.data[crossing[location].over].label;
+              //  cout<<u1<<" "<<u2<<" and "<<o<<" respectively which has data index ";
+              //  cout<<crossing[location].under1<<" "<<crossing[location].under2<<" and "<<crossing[location].over<" respectively";
+                if(u1!=-1)
+                {
+                    for(int j=0;j<n;j++)
+                    {
+                        curr.data[crossing[location].over].label=j;
+                        S.push(curr);
+                    }
+                }
+                else if(u2!=-1)
+                {
+                    for(int j=0;j<n;j++)
+                    {
+                        curr.data[crossing[location].over].label=j;
+                        S.push(curr);
+                    }
+                }
+                else
+                {
+                    for(int j=0;j<n;j++)
+                    {
+                        curr.data[crossing[location].under1].label=j;
+                        S.push(curr);
+                    }
+                }
+            }
+        }
+    }
+
+    if(found)
+    {  // cout<<"\nAnd found I have!!!";
+        tricolorability=1;
+        cout<<"\n\n"<<"For "<<n<<"-colorability, this is how you color it:";
+        for(int i=0;i<crossing_count;i++)
+        {
+            bridge[i].label=curr.data[i].label;
+            cout<<"\nArc "<<bridge[i].s<<" to "<<bridge[i].d<<" has label "<<bridge[i].label;
+        }
+    }
+    else
+    {
+        tricolorability=0;
+      //  cout<<"\nI feel like I'm running around for nothing";
+    }
+
+
+
+
+}
 

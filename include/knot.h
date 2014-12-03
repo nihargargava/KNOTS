@@ -25,6 +25,9 @@ struct edge_pair
     int b;
     float location[2];
     int weight;
+    int over;
+    int under1;
+    int under2;
 };
 
 
@@ -35,6 +38,7 @@ struct bridge_struct
 {
     int s;
     int d;
+    int label;
 };
 
 
@@ -46,11 +50,11 @@ public:
     float vertex[500][3];
     line_segment edge[500];
     edge_pair crossing[500];
-    bridge_struct bridge[250];
+    bridge_struct bridge[500];
     int DTcode[500];
     int crossing_count;
     int vertex_count;
-    int bridge_count;
+    int tricolorability;
     float radius;
     int tessellation;
     float color[3];
@@ -59,6 +63,7 @@ public:
     int isLines;
     int writhe;
     int isHighlighted;
+    int DrawType; //0 for polynomial, 1 for cubic splines
 
     float light_ambient[4];
     float light_diffuse[4];
@@ -78,6 +83,7 @@ public:
     void findCrossings();
     void findWrithe();
     void findDTandBridges();
+    void findTricolorability(int);
 
 };
 

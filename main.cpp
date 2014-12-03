@@ -5,11 +5,11 @@ Undergraduate Student of Mathematics
 This is my attempt at making a simulator of Mathematical Knots.
 At this point of time, this is what the program can do (as of now):
 
-1.) Take an input knot: The input methods are quite intutive.
-Mouse motion is for x and y axes, scroll is for z axis.
+1.) Take an input knot: The input methods are quite intuitive.
+    Mouse motion is for x and y axes, scroll is for z axis (or use '1', '2').
 
 2.) Find the crossings and mark them: Red is for positive weighted crossing,
-    Black is for negitive. Writhe is calculated as the total of them all.
+    Black is for negative. Writhe is calculated as the total of them all.
 
 3.) Find the DT code: The DT code is calculated according to the orientation
     Assigned while drawing the knot. The first crossing is taken as 1.
@@ -22,10 +22,9 @@ in a newer OpenGL as soon as the Knot handling part is stable.
 
 2.) No GUI/HUD text on the screen. This needs to be added.
 
-3.) The positive/negative signs of the DT code are wrong. Needs Debugging
+3.) Must add more comment on everything
 
-4.) There could be corner cases of intersection or division by zero errors
-that have not shown up in testing yet.
+4.) Spline interpolation must be implemented
 *******************************************************************/
 #include<GL/gl.h>
 #include<GL/glu.h>
@@ -35,17 +34,18 @@ that have not shown up in testing yet.
 #ifdef __APPLE__
 #include <GLUT/glut.h>
 #else
-#include <GL/glut.h>
+#include <GL/freeglut.h>
 #endif
 #include <iostream>
 #include <stdlib.h>
 #include <knot.h>
 #include <math.h>
-static int slices = 16;
-static int stacks = 16;
+
 int lastState;
 int ctrl_flag;
 int shift_flag;
+int crossing_marker_flag;
+int crossing_number_flag;
 
 float rot_100;
 float rot_010;
@@ -65,6 +65,16 @@ void initGL() {
 }
 
 
+void text(char str[],double x,double y,double z=0,int choice=1)
+{
+    glColor3d(0.0,0.0,0.0);
+    glRasterPos3d(x,y,z);
+    if(choice)glutBitmapString(GLUT_BITMAP_HELVETICA_12,(const unsigned char*)str);
+    else glutBitmapString(GLUT_BITMAP_TIMES_ROMAN_10,(const unsigned char*)str);
+}
+
+
+
 static void resize(int width, int height)
 {
     const float ar = (float) width / (float) height;
@@ -72,16 +82,14 @@ static void resize(int width, int height)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
   //  glFrustum(-ar, ar, -1.0, 1.0, 2.0, 100.0);
-    gluPerspective(45.0f, ar, 0.1f, 100.0f);
-	//glOrtho(-5.0,5.0,-5.0,5.0,-100.0,100.0);
+//    gluPerspective(45.0f, ar, 0.1f, 100.0f);
+	glOrtho(-5.0,5.0,-5.0,5.0,-100.0,100.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity() ;
 }
 
 static void display(void)
 {
-    const double t = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
-    const double a = t*90.0;
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // glColor3d(0.5,0.5,0.5);
@@ -89,27 +97,57 @@ static void display(void)
     glTranslatef(0,0,-10);
     glRotatef(rot_100,1,0,0);
     glRotatef(rot_010,0,1,0);
-
+    char STRING[10];
     test.draw();
-    if(1)
+    if(crossing_marker_flag)
     {
         for(int i=0;i<test.crossing_count;i++)
         {
             glPushMatrix();
             glTranslatef(test.crossing[i].location[0],test.crossing[i].location[1],0);
             if(test.crossing[i].weight==1)
+            {
                 crossing_marker.color[0]=1.0;
-            else crossing_marker.color[0]=0.0;
+                if(crossing_marker_flag==2)text("+1",0,0,10,0);
+            }
+            else
+            {
+                crossing_marker.color[0]=0.0;
+                if(crossing_marker_flag==2)text("-1",0,0,10,0);
+            }
+            if(i<10)
+            {
+                STRING[0]=i+'0';
+                STRING[1]='\0';
+            }
+            else if(i<100)
+            {  // printf("%d",i);
+                STRING[0]=i/10;
+                STRING[1]=i%10;
+                STRING[2]='\0';
+            }
+            else
+            {
+                STRING[0]=i/100;
+                STRING[1]=(i%100)/10;
+                STRING[2]=i%10;
+                STRING[3]='\0';
+            }
+            text(STRING,0.2,0.2,10.0);
 
-            crossing_marker.draw();
+            if(crossing_marker_flag==1)crossing_marker.draw();
             glPopMatrix();
         }
     }
-    pointer.draw();
-
+    if(test.isBeingEdited)
+    {   pointer.draw();
+        text("     DRAW" ,pointer.vertex[0][0],pointer.vertex[0][1],pointer.vertex[0][2]);
+    }
     glTranslatef(0,0,10);
     glPopMatrix();
+    text("Created by: Nihar Gargava",2.5,-4.8,10);
     glutSwapBuffers();
+
 }
 
 
@@ -143,17 +181,49 @@ static void key(unsigned char key, int x, int y)
         test.findCrossings();
         test.findWrithe();
         test.findDTandBridges();
+        for(int h=3;h<test.crossing_count+2;h+=2)
+        {
+            test.findTricolorability(h);
+            cout<<"\n"<<h<<"-colorability :";
+            if(test.tricolorability)
+            {
+                cout<<"Yes";
+            }
+            else
+            {
+                cout<<"No";
+            }
+        }
         cout<<"\nWrithe: "<<test.writhe<<"\nDT Code: ";
         for(int i=0;i<test.crossing_count;i++)
         {
             cout<<"  "<<test.DTcode[i];
         }
+        cout<<"\n\nArcs =("<<test.crossing_count<<") : ";
+        for(int i=0;i<test.crossing_count;i++)
+        {
+            cout<<"\n> Crossing "<<i<<" has u1,2,o as "<<test.crossing[i].under1<<","<<test.crossing[i].under2<<" and "<<test.crossing[i].over<<" respectively";
+        }
+
+
         break;
     case 'z':
         ctrl_flag=1-ctrl_flag;
         break;
-    case GLUT_KEY_SHIFT_L:
-//    case GLUT_KEY_SHIFT_R:
+
+    case '1':
+        pointer.vertex[0][2]+=0.2;
+        test.popPoint();
+        test.pushPoint(pointer.vertex[0]);
+        break;
+    case '2':
+        pointer.vertex[0][2]-=0.2;
+        test.popPoint();
+        test.pushPoint(pointer.vertex[0]);
+        break;
+    case '0':
+        crossing_marker_flag++;
+        crossing_marker_flag%=3;
         break;
     }
 
@@ -181,7 +251,7 @@ void mouse(int button, int state, int x, int y)
     }
     lastState=state;
 
-    glutPostRedisplay();
+//    glutPostRedisplay();
 }
 
 void motionMouse(int x,int y)
@@ -197,6 +267,9 @@ void motionMouse(int x,int y)
         rot_010=pointer.vertex[0][0]*-20;
         rot_100=pointer.vertex[0][1]*-20;
     }
+
+    test.findCrossings();
+    test.findWrithe();
 }
 void mousewheel(int button,int state, int x, int y)
 {
@@ -216,7 +289,7 @@ int main(int argc, char *argv[])
 {
     pointer.pushPoint(0,0,0);
     test.pushPoint(pointer.vertex[0]);
-
+    crossing_marker_flag=2;
     crossing_marker.pushPoint(0,0,-100);
     crossing_marker.pushPoint(0,0,+100);
     crossing_marker.isLines=0;
@@ -241,7 +314,7 @@ int main(int argc, char *argv[])
     glutInitWindowPosition(10,10);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 
-    glutCreateWindow("GLUT Shapes");
+    glutCreateWindow("KNOTS");
 
     glutReshapeFunc(resize);
     glutDisplayFunc(display);
