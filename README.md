@@ -17,3 +17,7 @@ Assigned while drawing the knot. The first crossing is taken as 1.
 5.) Find the fox-n colorability of the knot. At this moment it cannot be done
 in the program and the value of n needs to be changed through the code. 
 Setting it to 3 gives tricolorability.
+
+I have uploaded some GIFs of this code on my blog. Open the link below to find it.
+
+https://globberingmattress.wordpress.com/2016/12/18/some-animated-but-static-knots/
